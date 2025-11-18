@@ -20,4 +20,26 @@ var Commands = []*xcli.Command{
 		},
 		RunI: &HelloCommand{},
 	},
+	{
+		Name:  "scheduler",
+		Short: "\tRun cron scheduler",
+		Options: []*xcli.Option{
+			{
+				Names: []string{"base"},
+				Usage: "Override task API base url",
+			},
+		},
+		RunI: &SchedulerCommand{},
+	},
+	{
+		Name:  "web",
+		Short: "\tRun Layui admin UI",
+		Options: []*xcli.Option{
+			{
+				Names: []string{"addr"},
+				Usage: "Listen address, default :8080",
+			},
+		},
+		RunI: &WebCommand{},
+	},
 }

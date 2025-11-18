@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <title>任务调度管理</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui-src/dist/css/layui.css" />
+    <style>
+        body {
+            padding: 20px;
+        }
+        .actions {
+            margin-bottom: 15px;
+        }
+        .layui-layer-content {
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="actions">
+        <button class="layui-btn" id="refreshBtn">刷新</button>
+        <button class="layui-btn layui-btn-normal" id="addTaskBtn">新增任务</button>
+    </div>
+    <table id="taskTable" lay-filter="taskTable"></table>
+
+    <script type="text/html" id="taskFormTpl">
+        <form class="layui-form" lay-filter="taskForm" style="padding: 15px;">
+            <div class="layui-form-item">
+                <label class="layui-form-label">任务名称</label>
+                <div class="layui-input-block">
+                    <input type="text" name="name" required lay-verify="required" placeholder="请输入任务名称" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">Command</label>
+                <div class="layui-input-block">
+                    <input type="text" name="command" required lay-verify="required" placeholder="任务对应 command" class="layui-input" />
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">Cron 表达式</label>
+                <div class="layui-input-block">
+                    <input type="text" name="run_expr" required lay-verify="required" placeholder="year month day week hour minute" class="layui-input" />
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">批次条数</label>
+                <div class="layui-input-block">
+                    <input type="number" name="data_count_limit" placeholder="每次 getdata 请求条数" class="layui-input" />
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">休眠(μs)</label>
+                <div class="layui-input-block">
+                    <input type="number" name="run_sleep_micro_second" placeholder="单条数据延时" class="layui-input" />
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">重试次数</label>
+                <div class="layui-input-block">
+                    <input type="number" name="try_times_limit" placeholder="可选" class="layui-input" />
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">执行方式</label>
+                <div class="layui-input-block">
+                    <input type="number" name="run_way" placeholder="可选" class="layui-input" />
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">描述</label>
+                <div class="layui-input-block">
+                    <textarea name="description" placeholder="备注" class="layui-textarea"></textarea>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <div class="layui-input-block">
+                    <button class="layui-btn" lay-submit lay-filter="taskSubmit">提交</button>
+                </div>
+            </div>
+        </form>
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/layui-src/dist/layui.js"></script>
+    <script>
+        layui.use(['table', 'form', 'layer'], function() {
+            var table = layui.table;
+            var form = layui.form;
+            var layer = layui.layer;
+            var currentLayerIndex = null;
+
+            table.render({
+                elem: '#taskTable',
+                id: 'taskTable',
+                url: '/api/tasks',
+                parseData: function(res){
+                    return {
+                        "code": res.code,
+                        "msg": res.msg,
+                        "count": res.count,
+                        "data": res.data
+                    };
+                },
+                cols: [[
+                    {field: 'id', title: 'ID', width: 80},
+                    {field: 'name', title: '任务名称', minWidth: 180},
+                    {field: 'command', title: 'Command', minWidth: 150},
+                    {field: 'run_expr', title: 'Cron 表达式', minWidth: 200},
+                    {field: 'status', title: '状态', width: 80, templet: function(d){ return d.status === 1 ? '运行中' : (d.status === -1 ? '异常' : '空闲'); }},
+                    {field: 'is_enable', title: '启用', width: 80, templet: function(d){ return d.is_enable === 0 ? '启用' : '禁用'; }},
+                    {field: 'data_count_limit', title: '批次条数', width: 100},
+                    {field: 'run_sleep_micro_second', title: '休眠(μs)', width: 120},
+                    {field: 'last_start_time', title: '最后开始时间', minWidth: 180}
+                ]],
+                page: false,
+                height: 'full-130'
+            });
+
+            document.getElementById('refreshBtn').onclick = function() {
+                table.reload('taskTable');
+            };
+
+            document.getElementById('addTaskBtn').onclick = function() {
+                currentLayerIndex = layer.open({
+                    type: 1,
+                    title: '新增任务',
+                    area: ['520px', '640px'],
+                    content: document.getElementById('taskFormTpl').innerHTML,
+                    success: function() {
+                        form.render(null, 'taskForm');
+                    }
+                });
+            };
+
+            form.on('submit(taskSubmit)', function(data) {
+                var field = data.field;
+                var payload = {
+                    name: field.name,
+                    command: field.command,
+                    run_expr: field.run_expr,
+                    data_count_limit: field.data_count_limit ? parseInt(field.data_count_limit, 10) : 0,
+                    run_sleep_micro_second: field.run_sleep_micro_second ? parseInt(field.run_sleep_micro_second, 10) : 0,
+                    try_times_limit: field.try_times_limit ? parseInt(field.try_times_limit, 10) : 0,
+                    run_way: field.run_way ? parseInt(field.run_way, 10) : 0,
+                    description: field.description || ''
+                };
+                fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).then(function(res){ return res.json(); })
+                .then(function(res){
+                    if (res.code === 0) {
+                        layer.msg('创建成功');
+                        if (currentLayerIndex !== null) {
+                            layer.close(currentLayerIndex);
+                            currentLayerIndex = null;
+                        }
+                        table.reload('taskTable');
+                    } else {
+                        layer.msg(res.msg || '提交失败');
+                    }
+                }).catch(function(err){
+                    console.error(err);
+                    layer.msg('网络错误');
+                });
+                return false;
+            });
+        });
+    </script>
+</body>
+</html>
